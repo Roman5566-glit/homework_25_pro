@@ -5,7 +5,10 @@ online_users_count = 0
 
 
 class ChatConsumer(AsyncWebsocketConsumer):
+    """Класс для обработки WebSocket-соединений чата и уведомлений"""
+
     async def connect(self):
+        """Обработка подключения клиента, добавление в группу и обновление счетчика"""
         global online_users_count
         self.room_group_name = "global_room"
         self.user = self.scope["user"]
@@ -25,6 +28,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
         )
 
     async def disconnect(self, close_code):
+        """Обработка отключения клиента, удаление из группы и уменьшение счетчика"""
         global online_users_count
 
         if online_users_count > 0:
@@ -42,7 +46,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
         )
 
     async def receive(self, text_data):
-        """Обробка вхідних повідомлень від клієнта."""
+        """Прием сообщений от клиента, проверка авторизации и маршрутизация по типам событий"""
         data = json.loads(text_data)
         action_type = data.get("type")
 
@@ -82,6 +86,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
             )
 
     async def system_broadcast(self, event):
+        """Рассылка системных уведомлений (статус онлайна и логи) всем клиентам"""
         await self.send(
             text_data=json.dumps(
                 {
@@ -93,6 +98,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
         )
 
     async def chat_broadcast(self, event):
+        """Рассылка новых сообщений чата всем клиентам"""
         await self.send(
             text_data=json.dumps(
                 {
@@ -104,6 +110,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
         )
 
     async def push_broadcast(self, event):
+        """Рассылка всплывающих push-уведомлений всем клиентам"""
         await self.send(
             text_data=json.dumps(
                 {
