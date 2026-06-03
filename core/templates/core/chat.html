@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <title>Django Channels WebSockets (ДЗ 25)</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 30px; background-color: #f4f6f9; }
+        .container { max-width: 600px; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        #counter-box { background: #e3f2fd; padding: 10px; border-radius: 5px; font-weight: bold; color: #0d47a1; margin-bottom: 15px; }
+        #chat-log { width: 100%; height: 200px; border: 1px solid #ccc; overflow-y: scroll; padding: 10px; background: #fafafa; margin-bottom: 10px; box-sizing: border-box; }
+        .push-container { background: #fff3e0; border-left: 5px solid #ff9800; padding: 10px; margin-bottom: 15px; border-radius: 4px; display: none; }
+        input[type="text"] { width: 75%; padding: 8px; box-sizing: border-box; }
+        button { padding: 8px 15px; cursor: pointer; font-weight: bold; }
+        .btn-push { background-color: #ff9800; color: white; border: none; border-radius: 4px; margin-left: 5px;}
+        .error-alert { color: red; font-weight: bold; margin-top: 10px; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>💬 Платформа Реального Часу</h2>
+    
+    <div id="counter-box">Користувачів онлайн: <span id="online-count">0</span></div>
+    
+    <div id="push-notification-zone" class="push-container"></div>
+
+    <div id="chat-log"></div>
+    
+    <div>
+        <input id="chat-message-input" type="text" placeholder="Введіть повідомлення...">
+        <button id="chat-message-submit">Надіслати</button>
+    </div>
+    
+    <div style="margin-top: 15px; border-top: 1px solid #eee; padding-top: 15px;">
+        <button id="push-trigger-btn" class="btn-push">📢 Надіслати всім PUSH-сповіщення</button>
+    </div>
+
+    <div id="error-zone" class="error-alert"></div>
+</div>
+
+<script>
+    // Автоматично визначаємо хост та створюємо WebSocket підключення
+    const wsScheme = window.location.protocol === "https:" ? "wss" : "ws";
+    const chatSocket = new WebSocket(
+        wsScheme + '://' + window.location.host + '/ws/chat/'
+    );
+
+    const chatLog = document.querySelector('#chat-log');
+    const onlineCountSpan = document.querySelector('#online-count');
+    const pushZone = document.querySelector('#push-notification-zone');
+    const errorZone = document.querySelector('#error-zone');
+
+    // Обробка подій, що прилітають від сервера
+    chatSocket.onmessage = function(e) {
+        const data = json.parse(e.data);
+        errorZone.innerText = ""; // Скидаємо помилки
+
+        // 1. Оновлення лічильника онлайн
+        if (data.action === 'update_counter') {
+            onlineCountSpan.innerText = data.count;
+            chatLog.innerHTML += `<i>⚙️ ${data.log}</i><br>`;
+            chatLog.scrollTop = chatLog.scrollHeight;
+        }
+        
+        // 2. Нове повідомлення в чаті
+        else if (data.action === 'new_message') {
+            chatLog.innerHTML += `<b>[${data.username}]:</b> ${data.message}<br>`;
+            chatLog.scrollTop = chatLog.scrollHeight;
+        }
+
+        // 3. Обробка глобального PUSH-сповіщення
+        else if (data.action === 'push_alert') {
+            pushZone.innerHTML = `🚨 <b>PUSH від ${data.sender}:</b> ${data.message}`;
+            pushZone.style.display = 'block';
+            // Ховаємо нотифікацію через 5 секунд
+            setTimeout(() => { pushZone.style.display = 'none'; }, 5000);
+        }
+
+        // 4. Обробка помилки доступу (для гостей)
+        else if (data.action === 'error_message') {
+            errorZone.innerText = data.error;
+        }
+    };
+
+    chatSocket.onclose = function(e) {
+        console.error('WebSocket закрився неочікувано.');
+    };
+
+    // Подія відправки звичайного повідомлення
+    document.querySelector('#chat-message-submit').onclick = function(e) {
+        const messageInputDom = document.querySelector('#chat-message-input');
+        const message = messageInputDom.value;
+        if(message.trim() === "") return;
+        
+        chatSocket.send(json.stringify({
+            'type': 'chat_message',
+            'message': message
+        }));
+        messageInputDom.value = '';
+    };
+
+    // Подія натискання кнопки PUSH-нотифікації
+    document.querySelector('#push-trigger-btn').onclick = function(e) {
+        chatSocket.send(json.stringify({
+            'type': 'push_notification',
+            'message': 'Увага! На сервері відбулася важлива подія!'
+        }));
+    };
+</script>
+</body>
+</html>
